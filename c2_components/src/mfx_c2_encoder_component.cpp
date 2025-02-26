@@ -1195,6 +1195,7 @@ mfxStatus MfxC2EncoderComponent::InitVPP(C2FrameData& buf_pack)
             m_mfxVideoParamsConfig.mfx.FrameInfo.BitDepthChroma = 10;
             m_mfxVideoParamsConfig.mfx.FrameInfo.Shift = 1;
         } else {
+#if PLATFORM_SDK_VERSION <= 34  // android 14 and before
             if ((!igbp_id && !igbp_slot) || (!igbp_id && igbp_slot == 0xffffffff)) {
                 //No surface & BQ
                 m_mfxVideoParamsConfig.IOPattern = MFX_IOPATTERN_IN_SYSTEM_MEMORY;
@@ -1207,7 +1208,19 @@ mfxStatus MfxC2EncoderComponent::InitVPP(C2FrameData& buf_pack)
                 MFX_LOG_INFO("Format = 0x%x. System memory is being used for encoding!", format);
                 if (MFX_ERR_NONE != mfx_res) MFX_DEBUG_TRACE_MSG("SetFrameAllocator failed");
             }
-
+#else // android 15
+            if(!C2AllocatorAhwb::CheckHandle(c_graph_block->handle())) {
+                m_mfxVideoParamsState.IOPattern = MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
+#ifdef USE_ONEVPL
+                mfx_res = MFXVideoCORE_SetFrameAllocator(m_mfxSession, nullptr);
+#else
+                mfx_res = m_mfxSession.SetFrameAllocator(nullptr);
+#endif
+                m_bAllocatorSet = false;
+                MFX_LOG_INFO("Format = 0x%x. System memory is being used for encoding!", format);
+                if (MFX_ERR_NONE != mfx_res) MFX_DEBUG_TRACE_MSG("SetFrameAllocator failed");
+            }
+#endif
             if (format == HAL_PIXEL_FORMAT_YCBCR_P010) {
                 m_mfxVideoParamsConfig.mfx.FrameInfo.FourCC = MFX_FOURCC_P010;
                 m_mfxVideoParamsConfig.mfx.FrameInfo.BitDepthLuma = 10;
